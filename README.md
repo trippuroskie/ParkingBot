@@ -1,64 +1,48 @@
 # Brighton Bot
 
-A Streamlit-based web application for automating parking reservations at Brighton Resort using Selenium WebDriver.
-
-## Description
-
-Brighton Bot automates the process of reserving parking spots at Brighton Resort through the Honk mobile platform. It features a user-friendly web interface built with Streamlit and uses Selenium for web automation.
+A parking reservation automation tool for Brighton Resort with both CLI and web interfaces.
 
 ## Prerequisites
 
-Before using the bot, ensure you have:
-1. A Honk mobile account
-2. Saved credit card information at [Honk Payment Cards](https://parking.honkmobile.com/payment-cards)
-3. Only one license plate saved at [Honk Vehicles](https://parking.honkmobile.com/vehicles)
-4. Python 3.7 or higher installed
-5. Chrome browser installed
-6. ChromeDriver compatible with your Chrome version
+1. Honk mobile account with:
+   - Saved credit card at [Honk Payment Cards](https://parking.honkmobile.com/payment-cards)
+   - Single license plate at [Honk Vehicles](https://parking.honkmobile.com/vehicles)
+2. Python 3.7+
+3. Chrome browser
 
 ## Installation
 
-1. Clone the repository: 
-   ```bash
-   git clone <repository-url>
-   cd brighton-bot
-   ```
-2. Install the required packages:
+1. Clone the repository
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-3. Set up your environment variables in a `.env` file:
+3. Set up `.env` file:
    ```bash
-   HONK_USERNAME=<your_honk_username>
-   HONK_PASSWORD=<your_honk_password>
+   HONK_USERNAME=your_email
+   HONK_PASSWORD=your_password
    ```
-4. Run the Streamlit app:
-   ```bash
-   streamlit run main_v4_streamlit_working.py
-   ```
-5. Update the ChromeDriver path in the code to match your system's path.
 
 ## Usage
 
-1. In the web interface:
-   - Enter your Honk mobile email
-   - Enter your Honk mobile password
-   - Specify the target date (day of month)
-   - Set maximum attempts and sleep duration
-   - Click "Start Reservation"
-2. Alternatively, run the script directly from the command line:
-   ```bash
-   python main_v4_streamlit_working.py
-   ```
+### Web Interface
+```bash
+streamlit run main_st.py
+```
 
-## Important Notes
+### Command Line
+```bash
+python main.py
+```
 
-- The bot will automatically attempt to reserve a 4+ Carpool spot
-- The default price is set to $10.00
-- Make sure your ChromeDriver is compatible with your Chrome browser version
-- The bot includes error handling and multiple click attempt methods for reliability
+## Features
 
+- Automated 4+ Carpool spot reservation
+- Headless Chrome operation
+- Real-time logging
+- Configurable retry attempts and intervals
+- User-friendly web interface with dark mode
 
 ## Disclaimer
 
-This bot is for educational purposes only. Please use responsibly and in accordance with Brighton Resort's terms of service.
+For educational purposes only. Use responsibly and in accordance with Brighton Resort's terms of service.
