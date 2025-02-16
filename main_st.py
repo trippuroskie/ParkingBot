@@ -13,12 +13,25 @@ from dotenv import load_dotenv
 import base64
 from datetime import datetime
 import random
+import threading
+import queue
+
+# Initialize session state variables
+if 'job_running' not in st.session_state:
+    st.session_state.job_running = False
+if 'job_complete' not in st.session_state:
+    st.session_state.job_complete = False
+if 'log_queue' not in st.session_state:
+    st.session_state.log_queue = queue.Queue()
+if 'error_message' not in st.session_state:
+    st.session_state.error_message = None
 
 def log_with_timestamp(*args):
     """Modified log_with_timestamp function for Streamlit"""
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
     message = " ".join(str(arg) for arg in args)
-    st.info(f"[{timestamp}] {message}")
+    if hasattr(st.session_state, 'log_queue'):
+        st.session_state.log_queue.put(f"[{timestamp}] {message}")
 
 def is_mobile():
     """Check if the user is on a mobile device"""
@@ -912,5 +925,91 @@ def main():
         if is_mobile():
             st.info("Mobile device detected. Optimizing for mobile browsing.")
 
-    # Rest of your existing Streamlit UI code...
-    st.markdown('<h1 class="title">Brighton Bot</h1>', unsafe_allow_html=True)
+    # Create a placeholder for logs at the top
+    log_placeholder = st.empty()
+    
+    # Create the main form
+    with st.form("reservation_form"):
+        username = st.text_input('Enter your Honk mobile email:', 
+                               value=os.getenv('HONK_USERNAME', ''), 
+                               key='username',
+                               help="Your Honk mobile account email")
+        
+        password = st.text_input('Enter your Honk mobile password:', 
+                               value=os.getenv('HONK_PASSWORD', ''), 
+                               type='password', 
+                               key='password',
+                               help="Your Honk mobile account password")
+        
+        target_date = st.text_input('Enter target date (day of month):', 
+                                  key='target_date',
+                                  help="The day of the month you want to reserve (e.g., '15')")
+        
+        col_attempts, col_sleep = st.columns(2)
+        with col_attempts:
+            max_attempts = st.number_input('Maximum attempts:', 
+                                         min_value=1, 
+                                         value=100, 
+                                         key='max_attempts',
+                                         help="Maximum number of times to check for availability")
+        
+        with col_sleep:
+            sleep_duration = st.number_input('Sleep duration (seconds):', 
+                                           min_value=1, 
+                                           value=5, 
+                                           key='sleep_duration',
+                                           help="Time to wait between attempts")
+        
+        submitted = st.form_submit_button("Start Reservation")
+
+    # Handle form submission
+    if submitted:
+        if not username or not password or not target_date:
+            st.error('⚠️ Please fill in all required fields')
+        else:
+            st.info("""
+            ℹ️ Important Note:
+            Once you see "Running on Streamlit Cloud with Chromium", the process will continue running on our servers even if you:
+            - Close your browser
+            - Turn off your phone
+            - Lose internet connection
+            
+            You can return to this page later to check the results.
+            The process will keep running until it succeeds or reaches maximum attempts.
+            """)
+            
+            start_background_job(username, password, target_date, max_attempts, sleep_duration)
+
+    # Display job status and logs
+    if st.session_state.job_running:
+        st.warning("🔄 Job is currently running...")
+        
+        # Display logs
+        logs = []
+        while not st.session_state.log_queue.empty():
+            logs.append(st.session_state.log_queue.get())
+        
+        # Update the log placeholder with all logs
+        with log_placeholder.container():
+            for log in logs:
+                st.info(log)
+    
+    elif st.session_state.job_complete:
+        st.success("✅ Job completed successfully!")
+        
+        # Display final logs
+        with log_placeholder.container():
+            while not st.session_state.log_queue.empty():
+                st.info(st.session_state.log_queue.get())
+    
+    elif st.session_state.error_message:
+        st.error(f"❌ Error: {st.session_state.error_message}")
+        st.error('Please check your credentials and try again.')
+        
+        # Display error logs
+        with log_placeholder.container():
+            while not st.session_state.log_queue.empty():
+                st.info(st.session_state.log_queue.get())
+
+if __name__ == "__main__":
+    main()
