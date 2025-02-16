@@ -248,21 +248,42 @@ class ReserveDate:
 
     def select_carpool(self):
         try:
+            log_with_timestamp("Looking for carpool option...")
             carpool_element = self.wait.until(EC.element_to_be_clickable((
                 By.XPATH, "//div[text()='4+ Carpool (Occupancy will be verified by Parking Ambassador upon arrival)']"
             )))
             
+            log_with_timestamp("Found carpool option, attempting to click...")
             try:
                 carpool_element.click()
+                log_with_timestamp("Clicked carpool option using standard click")
             except:
                 try:
                     self.driver.execute_script("arguments[0].click();", carpool_element)
+                    log_with_timestamp("Clicked carpool option using JavaScript")
                 except:
                     actions = ActionChains(self.driver)
                     actions.move_to_element(carpool_element).click().perform()
+                    log_with_timestamp("Clicked carpool option using Action Chains")
+            
+            # Verify selection
+            time.sleep(2)
+            try:
+                # Check if the element has a selected state or different styling
+                selected_state = carpool_element.get_attribute("class") or ""
+                if "selected" in selected_state.lower() or "active" in selected_state.lower():
+                    log_with_timestamp("Carpool option selection verified")
+                else:
+                    log_with_timestamp("Warning: Could not verify carpool selection state")
+            except:
+                log_with_timestamp("Warning: Could not check carpool selection state")
                     
         except Exception as e:
             log_with_timestamp(f"Error in select_carpool: {e}")
+            log_with_timestamp(f"Current URL: {self.driver.current_url}")
+            log_with_timestamp("Page source:")
+            log_with_timestamp(self.driver.page_source[:1000])
+            raise
 
     def checkout(self):
         try:
@@ -532,42 +553,78 @@ st.markdown("""
     /* Style for labels and text */
     .stTextInput label, .stNumberInput label, p {
         color: black !important;
+        font-weight: bold !important;
         font-size: 1.2rem !important;
+        text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5) !important;
     }
     
     /* Style for the main container */
     .main-container {
-        background-color: rgba(0, 0, 0, 0.5) !important;
+        background-color: rgba(0, 0, 0, 0.7) !important;
         padding: 2rem !important;
         border-radius: 10px !important;
         margin: 1rem 0 !important;
         width: 100% !important;
         box-sizing: border-box !important;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
     }
     
     /* Style for links */
     a {
         color: #1E90FF !important;
+        text-decoration: none !important;
+        font-weight: bold !important;
+    }
+    
+    a:hover {
+        text-decoration: underline !important;
     }
     
     /* Style for the title */
     .title {
         color: black !important;
-        margin-bottom: 2rem;
+        margin-bottom: 2rem !important;
+        text-align: center !important;
+        font-size: 2.5rem !important;
+        font-weight: bold !important;
+        text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.5) !important;
     }
 
     /* Style for the button */
     .stButton button {
-        background-color: #1E90FF;
-        color: white;
-        border: none;
-        padding: 0.5rem 1rem;
-        border-radius: 4px;
+        background-color: #1E90FF !important;
+        color: white !important;
+        border: none !important;
+        padding: 0.75rem 1.5rem !important;
+        border-radius: 4px !important;
+        font-weight: bold !important;
+        width: 100% !important;
+        transition: all 0.3s ease !important;
+    }
+
+    .stButton button:hover {
+        background-color: #0066CC !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
     }
 
     /* Ensure container contents are properly styled */
     .main-container > * {
         color: white !important;
+    }
+    
+    /* Style for info text */
+    .info-text {
+        background-color: rgba(30, 144, 255, 0.1) !important;
+        padding: 1rem !important;
+        border-radius: 4px !important;
+        margin-bottom: 1rem !important;
+    }
+    
+    /* Style for warning text */
+    .warning-text {
+        color: #FFA500 !important;
+        font-weight: bold !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -578,41 +635,95 @@ st.markdown('<h1 class="title">Brighton Bot</h1>', unsafe_allow_html=True)
 # Create the main container with a dark background
 st.markdown("""
     <div class="main-container">
+        <p style="font-size: 1.3rem; margin-bottom: 1.5rem;">⚠️ Important Prerequisites:</p>
         <p>Before using, make sure on Honk mobile you have:</p>
         <ol>
-            <li>Your credit card info saved at: <a href="https://parking.honkmobile.com/payment-cards">https://parking.honkmobile.com/payment-cards</a></li>
-            <li>Only one license plate saved at: <a href="https://parking.honkmobile.com/vehicles">https://parking.honkmobile.com/vehicles</a></li>
+            <li>Your credit card info saved at: <a href="https://parking.honkmobile.com/payment-cards" target="_blank">https://parking.honkmobile.com/payment-cards</a></li>
+            <li>Only one license plate saved at: <a href="https://parking.honkmobile.com/vehicles" target="_blank">https://parking.honkmobile.com/vehicles</a></li>
         </ol>
     </div>
 """, unsafe_allow_html=True)
 
 # Add form elements inside a container with the same styling
 with st.container():
-    
     col1, col2 = st.columns([3, 1])
+    
     with col1:
         # Load environment variables
         load_dotenv()
         default_username = os.getenv('HONK_USERNAME', '')
         default_password = os.getenv('HONK_PASSWORD', '')
         
-        username = st.text_input('Enter your Honk mobile email:', value=default_username, key='username')
-        password = st.text_input('Enter your Honk mobile password:', value=default_password, type='password', key='password')
-        target_date = st.text_input('Enter target date (day of month):', key='target_date')
-        max_attempts = st.number_input('Maximum number of attempts:', min_value=1, value=100, key='max_attempts')
-        sleep_duration = st.number_input('Sleep duration between attempts (seconds):', min_value=1, value=5, key='sleep_duration')
+        with st.form("reservation_form"):
+            username = st.text_input('Enter your Honk mobile email:', 
+                                   value=default_username, 
+                                   key='username',
+                                   help="Your Honk mobile account email")
+            
+            password = st.text_input('Enter your Honk mobile password:', 
+                                   value=default_password, 
+                                   type='password', 
+                                   key='password',
+                                   help="Your Honk mobile account password")
+            
+            target_date = st.text_input('Enter target date (day of month):', 
+                                      key='target_date',
+                                      help="The day of the month you want to reserve (e.g., '15')")
+            
+            col_attempts, col_sleep = st.columns(2)
+            with col_attempts:
+                max_attempts = st.number_input('Maximum attempts:', 
+                                             min_value=1, 
+                                             value=100, 
+                                             key='max_attempts',
+                                             help="Maximum number of times to check for availability")
+            
+            with col_sleep:
+                sleep_duration = st.number_input('Sleep duration (seconds):', 
+                                               min_value=1, 
+                                               value=5, 
+                                               key='sleep_duration',
+                                               help="Time to wait between attempts")
+            
+            submitted = st.form_submit_button("Start Reservation")
+            
+            if submitted:
+                if not username or not password or not target_date:
+                    st.error('⚠️ Please fill in all required fields')
+                else:
+                    try:
+                        with st.spinner('Starting reservation process...'):
+                            bot = ReserveDate()
+                            bot.make_reservation(
+                                username,
+                                password,
+                                target_date,
+                                int(max_attempts),
+                                float(sleep_duration)
+                            )
+                    except Exception as e:
+                        st.error(f'❌ Error: {str(e)}')
+                        st.error('Please check your credentials and try again.')
+                    finally:
+                        st.info('✨ Process completed. Check the logs above for details.')
+
+    # Add helpful information in the sidebar
+    with st.sidebar:
+        st.markdown("""
+        ### 📋 Instructions
         
-        if st.button('Start Reservation'):
-            if not username or not password or not target_date:
-                st.error('Please fill in all required fields')
-            else:
-                bot = ReserveDate()
-                bot.make_reservation(
-                    username,
-                    password,
-                    target_date,
-                    int(max_attempts),
-                    float(sleep_duration)
-                )
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+        1. Enter your Honk mobile credentials
+        2. Specify the target date (day of month)
+        3. Adjust attempts and sleep duration if needed
+        4. Click "Start Reservation"
+        
+        ### ⚡ Tips
+        
+        - Keep the window open while the bot runs
+        - Check the logs for real-time updates
+        - If you get errors, try increasing sleep duration
+        
+        ### 🔒 Security Note
+        
+        Your credentials are only used to log in to Honk mobile and are never stored.
+        """)
