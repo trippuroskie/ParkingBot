@@ -20,6 +20,15 @@ def log_with_timestamp(*args):
     message = " ".join(str(arg) for arg in args)
     st.info(f"[{timestamp}] {message}")
 
+def is_mobile():
+    """Check if the user is on a mobile device"""
+    try:
+        # Get user agent from Streamlit's session state
+        user_agent = st.session_state.get('user_agent', '')
+        return any(device in user_agent.lower() for device in ['mobile', 'android', 'iphone', 'ipad', 'ipod'])
+    except:
+        return False
+
 # Move ReserveDate class definition to the top
 class ReserveDate:
     def __init__(self, chromedriver_path=None):
@@ -30,7 +39,19 @@ class ReserveDate:
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--window-size=1920,1080")
+        
+        # Check if user is on mobile
+        if is_mobile():
+            log_with_timestamp("Mobile device detected, adjusting browser settings...")
+            # Mobile-specific settings
+            chrome_options.add_argument("--window-size=375,812")  # iPhone X dimensions
+            chrome_options.add_argument("--touch-events=enabled")
+            chrome_options.add_argument('--user-agent=Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1')
+        else:
+            # Desktop settings
+            chrome_options.add_argument("--window-size=1920,1080")
+            chrome_options.add_argument(f'--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        
         chrome_options.add_argument('--enable-javascript')
         chrome_options.add_argument("--start-maximized")
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
@@ -39,7 +60,6 @@ class ReserveDate:
         chrome_options.add_argument('--lang=en-US,en;q=0.9')
         chrome_options.add_argument('--ignore-certificate-errors')
         chrome_options.add_argument('--allow-running-insecure-content')
-        chrome_options.add_argument(f'--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         
         # Add additional preferences
         chrome_options.add_experimental_option('excludeSwitches', ['enable-automation', 'enable-logging'])
@@ -140,11 +160,22 @@ class ReserveDate:
             self.wait.until(lambda driver: driver.execute_script('return document.readyState') == 'complete')
             time.sleep(3)  # Additional wait for JavaScript
             
+            # Scroll to ensure elements are in view for mobile
+            self.driver.execute_script("window.scrollTo(0, 0);")
+            
             log_with_timestamp("Waiting for email field...")
             email_element = self.wait.until(
                 EC.presence_of_element_located((By.ID, "emailAddress"))
             )
             self.wait.until(EC.element_to_be_clickable((By.ID, "emailAddress")))
+            
+            # Ensure element is in view and click it first (important for mobile)
+            self.driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", email_element)
+            time.sleep(1)
+            try:
+                email_element.click()
+            except:
+                self.driver.execute_script("arguments[0].click();", email_element)
             
             # Clear and enter email with random delays
             email_element.clear()
@@ -154,7 +185,19 @@ class ReserveDate:
                 time.sleep(random.uniform(0.1, 0.3))
             
             log_with_timestamp("Entering password...")
-            password_element = self.driver.find_element(By.ID, "password")
+            password_element = self.wait.until(
+                EC.presence_of_element_located((By.ID, "password"))
+            )
+            self.wait.until(EC.element_to_be_clickable((By.ID, "password")))
+            
+            # Ensure password field is in view and click it
+            self.driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", password_element)
+            time.sleep(1)
+            try:
+                password_element.click()
+            except:
+                self.driver.execute_script("arguments[0].click();", password_element)
+            
             password_element.clear()
             time.sleep(1)
             for char in password:
@@ -173,19 +216,55 @@ class ReserveDate:
             for selector_type, selector in button_selectors:
                 try:
                     login_button = self.wait.until(EC.element_to_be_clickable((selector_type, selector)))
-                    break
+                    if login_button.is_displayed():
+                        break
                 except:
                     continue
             
             if not login_button:
                 raise Exception("Could not find login button")
             
-            log_with_timestamp("Clicking login button...")
+            # Ensure login button is in view
+            self.driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", login_button)
             time.sleep(2)  # Wait before clicking
+            
+            log_with_timestamp("Clicking login button...")
             try:
-                login_button.click()
-            except:
-                self.driver.execute_script("arguments[0].click();", login_button)
+                # Try multiple click methods
+                try:
+                    login_button.click()
+                except:
+                    try:
+                        self.driver.execute_script("arguments[0].click();", login_button)
+                    except:
+                        actions = ActionChains(self.driver)
+                        actions.move_to_element(login_button).click().perform()
+            except Exception as click_error:
+                log_with_timestamp(f"Click error: {str(click_error)}")
+                # Try tapping for mobile
+                try:
+                    actions = ActionChains(self.driver)
+                    actions.move_to_element(login_button)
+                    actions.click()
+                    actions.perform()
+                except:
+                    self.driver.execute_script("""
+                        var evt = new MouseEvent('touchstart', {
+                            'view': window,
+                            'bubbles': true,
+                            'cancelable': true
+                        });
+                        arguments[0].dispatchEvent(evt);
+                        
+                        setTimeout(function() {
+                            var evt = new MouseEvent('touchend', {
+                                'view': window,
+                                'bubbles': true,
+                                'cancelable': true
+                            });
+                            arguments[0].dispatchEvent(evt);
+                        }, 50);
+                    """, login_button)
             
             # Wait for login to complete
             log_with_timestamp("Waiting for login to complete...")
@@ -811,3 +890,15 @@ with st.container():
         
         Your credentials are only used to log in to Honk mobile and are never stored.
         """)
+
+# Add this at the start of your Streamlit UI code
+def main():
+    # Store user agent in session state
+    if 'user_agent' not in st.session_state:
+        user_agent = st.get_user_agent()
+        st.session_state['user_agent'] = str(user_agent)
+        if is_mobile():
+            st.info("Mobile device detected. Optimizing for mobile browsing.")
+
+    # Rest of your existing Streamlit UI code...
+    st.markdown('<h1 class="title">Brighton Bot</h1>', unsafe_allow_html=True)
