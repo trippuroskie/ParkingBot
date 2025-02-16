@@ -33,14 +33,40 @@ def log_with_timestamp(*args):
     if hasattr(st.session_state, 'log_queue'):
         st.session_state.log_queue.put(f"[{timestamp}] {message}")
 
-def is_mobile():
-    """Check if the user is on a mobile device"""
+def background_reservation(username, password, target_date, max_attempts, sleep_duration):
+    """Function to run the reservation process in the background"""
     try:
-        # Get user agent from Streamlit's session state
-        user_agent = st.session_state.get('user_agent', '')
-        return any(device in user_agent.lower() for device in ['mobile', 'android', 'iphone', 'ipad', 'ipod'])
-    except:
-        return False
+        bot = ReserveDate()
+        bot.make_reservation(
+            username,
+            password,
+            target_date,
+            int(max_attempts),
+            float(sleep_duration)
+        )
+        st.session_state.job_complete = True
+    except Exception as e:
+        st.session_state.error_message = str(e)
+    finally:
+        st.session_state.job_running = False
+        
+def start_background_job(username, password, target_date, max_attempts, sleep_duration):
+    """Start the background job if it's not already running"""
+    if not st.session_state.job_running:
+        st.session_state.job_running = True
+        st.session_state.job_complete = False
+        st.session_state.error_message = None
+        # Clear the log queue
+        while not st.session_state.log_queue.empty():
+            st.session_state.log_queue.get()
+        
+        # Start the background thread
+        thread = threading.Thread(
+            target=background_reservation,
+            args=(username, password, target_date, max_attempts, sleep_duration)
+        )
+        thread.daemon = True
+        thread.start()
 
 # Move ReserveDate class definition to the top
 class ReserveDate:
@@ -53,18 +79,9 @@ class ReserveDate:
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         
-        # Check if user is on mobile
-        if is_mobile():
-            log_with_timestamp("Mobile device detected, adjusting browser settings...")
-            # Mobile-specific settings
-            chrome_options.add_argument("--window-size=375,812")  # iPhone X dimensions
-            chrome_options.add_argument("--touch-events=enabled")
-            chrome_options.add_argument('--user-agent=Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1')
-        else:
-            # Desktop settings
-            chrome_options.add_argument("--window-size=1920,1080")
-            chrome_options.add_argument(f'--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-        
+        # Desktop settings (we'll use desktop settings for all environments to ensure consistency)
+        chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument(f'--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         chrome_options.add_argument('--enable-javascript')
         chrome_options.add_argument("--start-maximized")
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
@@ -881,14 +898,7 @@ with st.container():
                     
                     try:
                         with st.spinner('Starting reservation process...'):
-                            bot = ReserveDate()
-                            bot.make_reservation(
-                                username,
-                                password,
-                                target_date,
-                                int(max_attempts),
-                                float(sleep_duration)
-                            )
+                            start_background_job(username, password, target_date, int(max_attempts), float(sleep_duration))
                     except Exception as e:
                         st.error(f'❌ Error: {str(e)}')
                         st.error('Please check your credentials and try again.')
@@ -922,8 +932,6 @@ def main():
     if 'user_agent' not in st.session_state:
         user_agent = st.get_user_agent()
         st.session_state['user_agent'] = str(user_agent)
-        if is_mobile():
-            st.info("Mobile device detected. Optimizing for mobile browsing.")
 
     # Create a placeholder for logs at the top
     log_placeholder = st.empty()
