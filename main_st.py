@@ -42,9 +42,20 @@ class ReserveDate:
             "profile.password_manager_enabled": False,
         })
         
-        # Use webdriver-manager to handle ChromeDriver installation and versioning
-        self.service = Service(ChromeDriverManager().install())
-        self.driver = webdriver.Chrome(service=self.service, options=chrome_options)
+        try:
+            # First try webdriver-manager approach
+            self.service = Service(ChromeDriverManager().install())
+            self.driver = webdriver.Chrome(service=self.service, options=chrome_options)
+        except Exception as e:
+            st.warning(f"Standard ChromeDriver initialization failed, trying Streamlit Cloud approach: {str(e)}")
+            try:
+                # Streamlit Cloud approach
+                chrome_options.binary_location = "/usr/bin/google-chrome"
+                self.service = Service()
+                self.driver = webdriver.Chrome(service=self.service, options=chrome_options)
+            except Exception as e2:
+                st.error(f"Both ChromeDriver initialization attempts failed: {str(e2)}")
+                raise
         
         # Set page load timeout
         self.driver.set_page_load_timeout(30)
