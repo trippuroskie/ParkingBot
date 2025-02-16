@@ -1,4 +1,4 @@
-# Brighton Bot
+# Parking Bot
 
 A parking reservation automation tool for Brighton Resort with both CLI and web interfaces.
 
