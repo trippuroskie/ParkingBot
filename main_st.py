@@ -12,6 +12,13 @@ import time
 import os
 from dotenv import load_dotenv
 import base64
+from datetime import datetime
+
+def log_with_timestamp(*args):
+    """Modified log_with_timestamp function for Streamlit"""
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+    message = " ".join(str(arg) for arg in args)
+    st.info(f"[{timestamp}] {message}")
 
 # Move ReserveDate class definition to the top
 class ReserveDate:
@@ -56,10 +63,10 @@ class ReserveDate:
 
     def login(self, username, password):
         try:
-            st.info("Attempting to navigate to login page...")
+            log_with_timestamp("Attempting to navigate to login page...")
             self.driver.get("https://reservenski.parkbrightonresort.com/login")
             
-            st.info("Waiting for email field...")
+            log_with_timestamp("Waiting for email field...")
             email_element = self.wait.until(EC.presence_of_element_located((By.ID, "emailAddress")))
             email_element.clear()
             time.sleep(1)
@@ -67,7 +74,7 @@ class ReserveDate:
                 email_element.send_keys(char)
                 time.sleep(0.1)
             
-            st.info("Entering password...")
+            log_with_timestamp("Entering password...")
             password_element = self.driver.find_element(By.ID, "password")
             password_element.clear()
             time.sleep(1)
@@ -75,7 +82,7 @@ class ReserveDate:
                 password_element.send_keys(char)
                 time.sleep(0.1)
             
-            st.info("Looking for login button...")
+            log_with_timestamp("Looking for login button...")
             try:
                 login_button = self.wait.until(EC.element_to_be_clickable((
                     By.CSS_SELECTOR, "button.Login_submitButton__fMHAq"
@@ -90,11 +97,11 @@ class ReserveDate:
                         By.CSS_SELECTOR, "button[type='submit']"
                     )))
             
-            st.info("Clicking login button...")
+            log_with_timestamp("Clicking login button...")
             self.driver.execute_script("arguments[0].click();", login_button)
             
             # Wait for login to complete and verify
-            st.info("Waiting for login to complete...")
+            log_with_timestamp("Waiting for login to complete...")
             time.sleep(5)
             
             # Verify login success by checking URL or specific elements
@@ -102,49 +109,49 @@ class ReserveDate:
             retry_count = 0
             while retry_count < max_retries:
                 current_url = self.driver.current_url
-                st.info(f"Current URL: {current_url}")
+                log_with_timestamp(f"Current URL: {current_url}")
                 
                 if "login" not in current_url.lower():
-                    st.success("Login successful - URL changed from login page")
+                    log_with_timestamp("Login successful - URL changed from login page")
                     break
                     
                 try:
                     # Check if we can find any error messages
                     error_messages = self.driver.find_elements(By.CSS_SELECTOR, "[class*='error'], [class*='alert']")
                     if error_messages:
-                        st.error("Found error messages: " + ", ".join([msg.text for msg in error_messages]))
+                        log_with_timestamp("Found error messages: " + ", ".join([msg.text for msg in error_messages]))
                         raise Exception("Login failed - error message found")
                 except:
                     pass
                 
                 retry_count += 1
                 if retry_count < max_retries:
-                    st.info(f"Login verification attempt {retry_count + 1}/{max_retries}...")
+                    log_with_timestamp(f"Login verification attempt {retry_count + 1}/{max_retries}...")
                     time.sleep(3)
             
             if retry_count >= max_retries:
                 raise Exception("Failed to verify login success after multiple attempts")
             
-            st.success("Login sequence completed and verified")
+            log_with_timestamp("Login sequence completed and verified")
             
         except Exception as e:
-            st.error(f"Error during login: {str(e)}")
-            st.error(f"Current URL: {self.driver.current_url}")
-            st.error("Page source:")
-            st.code(self.driver.page_source[:1000])
+            log_with_timestamp(f"Error during login: {str(e)}")
+            log_with_timestamp(f"Current URL: {self.driver.current_url}")
+            log_with_timestamp("Page source:")
+            log_with_timestamp(self.driver.page_source[:1000])
             raise
 
     def navigate_to_calendar(self):
         try:
-            st.info("Waiting for page to load after login...")
+            log_with_timestamp("Waiting for page to load after login...")
             time.sleep(5)  # Give more time for the page to settle after login
             
-            st.info("Looking for 'Reserve a Parking Spot' link...")
+            log_with_timestamp("Looking for 'Reserve a Parking Spot' link...")
             reserve_link = self.wait.until(EC.element_to_be_clickable((
                 By.XPATH, "//div[contains(text(), 'Reserve a Parking Spot')]"
             )))
             
-            st.info("Found link, attempting to click...")
+            log_with_timestamp("Found link, attempting to click...")
             try:
                 reserve_link.click()
             except:
@@ -154,15 +161,15 @@ class ReserveDate:
                     actions = ActionChains(self.driver)
                     actions.move_to_element(reserve_link).click().perform()
             
-            st.info("Clicked reserve link, waiting for calendar to load...")
+            log_with_timestamp("Clicked reserve link, waiting for calendar to load...")
             time.sleep(3)
-            st.success("Calendar navigation completed")
+            log_with_timestamp("Calendar navigation completed")
             
         except Exception as e:
-            st.error(f"Error in navigate_to_calendar: {str(e)}")
-            st.error(f"Current URL: {self.driver.current_url}")
-            st.error("Page source:")
-            st.code(self.driver.page_source[:1000])  # Print first 1000 chars of page source
+            log_with_timestamp(f"Error in navigate_to_calendar: {str(e)}")
+            log_with_timestamp(f"Current URL: {self.driver.current_url}")
+            log_with_timestamp("Page source:")
+            log_with_timestamp(self.driver.page_source[:1000])  # Print first 1000 chars of page source
             raise
 
     def check_date_availability(self, target_date_element):
@@ -173,7 +180,7 @@ class ReserveDate:
             target_color = "rgba(49, 200, 25, 0.2)"
             return background_color == target_color
         except Exception as e:
-            print(f"Error checking date availability: {e}")
+            log_with_timestamp(f"Error checking date availability: {e}")
             return False
 
     def select_date(self, target_date_text, max_attempts, sleep_duration):
@@ -214,22 +221,22 @@ class ReserveDate:
                         self.driver.execute_script("arguments[0].scrollIntoView(true);", target_date)
                         time.sleep(1)
                         self.driver.execute_script("arguments[0].click();", target_date)
-                        st.success(f"Successfully selected available date {target_date_text}")
+                        log_with_timestamp(f"Successfully selected available date {target_date_text}")
                         break
                     else:
-                        st.warning(f"Date {target_date_text} not available yet. Refreshing...")
+                        log_with_timestamp(f"Date {target_date_text} not available yet. Refreshing...")
                         time.sleep(sleep_duration)
                         self.driver.refresh()
                         attempt += 1
                 else:
-                    st.error(f"Could not find date element {target_date_text}")
+                    log_with_timestamp(f"Could not find date element {target_date_text}")
                     break
                     
                 if calendar_iframe:
                     self.driver.switch_to.default_content()
                     
             except Exception as e:
-                print(f"Error in select_date: {e}")
+                log_with_timestamp(f"Error in select_date: {e}")
                 if calendar_iframe:
                     self.driver.switch_to.default_content()
                 attempt += 1
@@ -255,7 +262,7 @@ class ReserveDate:
                     actions.move_to_element(carpool_element).click().perform()
                     
         except Exception as e:
-            print(f"Error in select_carpool: {e}")
+            log_with_timestamp(f"Error in select_carpool: {e}")
 
     def checkout(self):
         try:
@@ -277,19 +284,19 @@ class ReserveDate:
                     actions.move_to_element(parent_button).click().perform()
                     
         except Exception as e:
-            print(f"Error in checkout: {e}")
+            log_with_timestamp(f"Error in checkout: {e}")
 
     def confirm_reservation(self):
         try:
-            st.info("Waiting for payment page to load...")
+            log_with_timestamp("Waiting for payment page to load...")
             time.sleep(5)  # Initial wait for page load
             
             # First check if we're on the Honk payment page
             current_url = self.driver.current_url
-            st.info(f"Current URL: {current_url}")
+            log_with_timestamp(f"Current URL: {current_url}")
             
             if "honkmobile.com/checkout" in current_url:
-                st.info("Detected Honk payment page, looking for payment button...")
+                log_with_timestamp("Detected Honk payment page, looking for payment button...")
                 
                 # Wait for the page to be fully loaded
                 self.wait.until(lambda driver: driver.execute_script("return document.readyState") == "complete")
@@ -331,7 +338,7 @@ class ReserveDate:
                                 )
                                 
                                 if payment_button and payment_button.is_displayed():
-                                    st.success(f"Found payment button with selector: {selector}")
+                                    log_with_timestamp(f"Found payment button with selector: {selector}")
                                     
                                     # Try multiple click methods
                                     try:
@@ -348,10 +355,10 @@ class ReserveDate:
                                             actions.click()
                                             actions.perform()
                                     
-                                    st.success("Payment button clicked")
+                                    log_with_timestamp("Payment button clicked")
                                     
                                     # Wait for confirmation or success page
-                                    st.info("Waiting for payment to complete...")
+                                    log_with_timestamp("Waiting for payment to complete...")
                                     success_conditions = [
                                         "post-purchase" in self.driver.current_url,
                                         "confirmation" in self.driver.current_url,
@@ -363,7 +370,7 @@ class ReserveDate:
                                     while not any(success_conditions) and time.time() - start_time < max_wait:
                                         time.sleep(2)
                                         current_url = self.driver.current_url
-                                        st.info(f"Current URL while waiting: {current_url}")
+                                        log_with_timestamp(f"Current URL while waiting: {current_url}")
                                         success_conditions = [
                                             "post-purchase" in current_url,
                                             "confirmation" in current_url,
@@ -371,13 +378,13 @@ class ReserveDate:
                                         ]
                                     
                                     if any(success_conditions):
-                                        st.success("Payment completed successfully!")
+                                        log_with_timestamp("Payment completed successfully!")
                                         return
                                     
                                     raise Exception("Payment completion timeout")
                                     
                             except Exception as e:
-                                st.warning(f"Selector {selector} failed: {str(e)}")
+                                log_with_timestamp(f"Selector {selector} failed: {str(e)}")
                                 continue
                         
                         if main_content:
@@ -392,24 +399,24 @@ class ReserveDate:
                     except IndexError:
                         break
                     except Exception as e:
-                        st.warning(f"Error while checking frame: {str(e)}")
+                        log_with_timestamp(f"Error while checking frame: {str(e)}")
                         self.driver.switch_to.default_content()
                         if not iframes:
                             break
                 
                 # If we get here, we couldn't find the button
-                st.error("Could not find payment button. Page source:")
-                st.code(self.driver.page_source[:2000])
+                log_with_timestamp("Could not find payment button. Page source:")
+                log_with_timestamp(self.driver.page_source[:2000])
                 raise Exception("Payment button not found")
                 
             else:
                 raise Exception(f"Unexpected URL: {current_url}")
             
         except Exception as e:
-            st.error(f"Error in confirm_reservation: {str(e)}")
-            st.error(f"Final URL: {self.driver.current_url}")
-            st.error("Final page source:")
-            st.code(self.driver.page_source[:2000])
+            log_with_timestamp(f"Error in confirm_reservation: {str(e)}")
+            log_with_timestamp(f"Final URL: {self.driver.current_url}")
+            log_with_timestamp("Final page source:")
+            log_with_timestamp(self.driver.page_source[:2000])
             raise
 
     def close(self):
@@ -418,41 +425,41 @@ class ReserveDate:
     def make_reservation(self, username, password, target_date, max_attempts, sleep_duration):
         """Main method to execute the full reservation process"""
         try:
-            st.info("\nStarting reservation process...")
-            st.info(f"Target date: {target_date}")
-            st.info(f"Max attempts: {max_attempts}")
-            st.info(f"Sleep duration: {sleep_duration} seconds")
+            log_with_timestamp("\nStarting reservation process...")
+            log_with_timestamp(f"Target date: {target_date}")
+            log_with_timestamp(f"Max attempts: {max_attempts}")
+            log_with_timestamp(f"Sleep duration: {sleep_duration} seconds")
             
             self.login(username, password)
             
-            st.info("Attempting to navigate to calendar...")
+            log_with_timestamp("Attempting to navigate to calendar...")
             self.navigate_to_calendar()
             
-            st.info("Attempting to select date...")
+            log_with_timestamp("Attempting to select date...")
             self.select_date(target_date, max_attempts, sleep_duration)
             
-            st.info("Attempting to select carpool option...")
+            log_with_timestamp("Attempting to select carpool option...")
             self.select_carpool()
             
-            st.info("Proceeding to checkout...")
+            log_with_timestamp("Proceeding to checkout...")
             self.checkout()
             
-            st.info("Confirming reservation...")
+            log_with_timestamp("Confirming reservation...")
             self.confirm_reservation()
             
-            st.success("Reservation process completed successfully!")
+            log_with_timestamp("Reservation process completed successfully!")
             
         except Exception as e:
-            st.error(f"Error during reservation process: {str(e)}")
-            st.error("Attempting to capture error state...")
+            log_with_timestamp(f"Error during reservation process: {str(e)}")
+            log_with_timestamp("Attempting to capture error state...")
             try:
-                st.error(f"Current URL: {self.driver.current_url}")
-                st.error("Current page source:")
-                st.code(self.driver.page_source[:1000])
+                log_with_timestamp(f"Current URL: {self.driver.current_url}")
+                log_with_timestamp("Current page source:")
+                log_with_timestamp(self.driver.page_source[:1000])
             except:
-                st.error("Could not capture error state")
+                log_with_timestamp("Could not capture error state")
         finally:
-            st.info("Closing browser...")
+            log_with_timestamp("Closing browser...")
             self.close()
 
 def add_bg_from_local(image_file):
