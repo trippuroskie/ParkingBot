@@ -43,19 +43,26 @@ class ReserveDate:
         })
         
         try:
-            # First try webdriver-manager approach
-            self.service = Service(ChromeDriverManager().install())
-            self.driver = webdriver.Chrome(service=self.service, options=chrome_options)
-        except Exception as e:
-            st.warning(f"Standard ChromeDriver initialization failed, trying Streamlit Cloud approach: {str(e)}")
-            try:
-                # Streamlit Cloud approach
-                chrome_options.binary_location = "/usr/bin/google-chrome"
-                self.service = Service()
+            # Check if running on Streamlit Cloud
+            if os.path.exists("/usr/bin/chromium-browser"):
+                st.info("Running on Streamlit Cloud with Chromium")
+                chrome_options.binary_location = "/usr/bin/chromium-browser"
+                self.service = Service(executable_path="/usr/bin/chromedriver")
                 self.driver = webdriver.Chrome(service=self.service, options=chrome_options)
-            except Exception as e2:
-                st.error(f"Both ChromeDriver initialization attempts failed: {str(e2)}")
-                raise
+            else:
+                # Local development environment
+                st.info("Running in local environment")
+                self.service = Service(ChromeDriverManager().install())
+                self.driver = webdriver.Chrome(service=self.service, options=chrome_options)
+        except Exception as e:
+            st.error(f"Chrome initialization failed: {str(e)}")
+            st.error("Page source or additional error info:")
+            try:
+                if hasattr(self, 'driver'):
+                    st.error(self.driver.page_source[:1000])
+            except:
+                pass
+            raise
         
         # Set page load timeout
         self.driver.set_page_load_timeout(30)
