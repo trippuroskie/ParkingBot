@@ -928,10 +928,7 @@ with st.container():
 
 # Add this at the start of your Streamlit UI code
 def main():
-    # Store user agent in session state
-    if 'user_agent' not in st.session_state:
-        user_agent = st.get_user_agent()
-        st.session_state['user_agent'] = str(user_agent)
+    st.markdown('<h1 class="title">Brighton Bot</h1>', unsafe_allow_html=True)
 
     # Create a placeholder for logs at the top
     log_placeholder = st.empty()
