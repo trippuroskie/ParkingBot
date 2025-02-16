@@ -43,11 +43,28 @@ class ReserveDate:
         })
         
         try:
-            # Check if running on Streamlit Cloud
-            if os.path.exists("/usr/bin/chromium-browser"):
+            # Check if running on Streamlit Cloud (Debian environment)
+            if os.path.exists("/usr/bin/chromium"):
                 st.info("Running on Streamlit Cloud with Chromium")
-                chrome_options.binary_location = "/usr/bin/chromium-browser"
-                self.service = Service(executable_path="/usr/bin/chromedriver")
+                chrome_options.binary_location = "/usr/bin/chromium"
+                # Try multiple possible chromedriver locations
+                chromedriver_paths = [
+                    "/usr/bin/chromedriver",
+                    "/usr/lib/chromium/chromedriver",
+                    "/usr/lib/chromium-browser/chromedriver"
+                ]
+                
+                driver_path = None
+                for path in chromedriver_paths:
+                    if os.path.exists(path):
+                        driver_path = path
+                        st.info(f"Found chromedriver at: {path}")
+                        break
+                
+                if driver_path is None:
+                    raise Exception("Could not find chromedriver in any standard location")
+                
+                self.service = Service(executable_path=driver_path)
                 self.driver = webdriver.Chrome(service=self.service, options=chrome_options)
             else:
                 # Local development environment
@@ -56,9 +73,19 @@ class ReserveDate:
                 self.driver = webdriver.Chrome(service=self.service, options=chrome_options)
         except Exception as e:
             st.error(f"Chrome initialization failed: {str(e)}")
-            st.error("Page source or additional error info:")
+            st.error("Additional debugging information:")
+            try:
+                # List contents of relevant directories
+                for path in ["/usr/bin", "/usr/lib/chromium", "/usr/lib/chromium-browser"]:
+                    if os.path.exists(path):
+                        st.error(f"Contents of {path}:")
+                        st.error(str(os.listdir(path)))
+            except Exception as dir_error:
+                st.error(f"Error listing directories: {str(dir_error)}")
+            
             try:
                 if hasattr(self, 'driver'):
+                    st.error("Page source:")
                     st.error(self.driver.page_source[:1000])
             except:
                 pass
