@@ -854,6 +854,18 @@ with st.container():
                 if not username or not password or not target_date:
                     st.error('⚠️ Please fill in all required fields')
                 else:
+                    # Add information about background processing
+                    st.info("""
+                    ℹ️ Important Note:
+                    Once the process starts, it will continue running on our servers even if you:
+                    - Close your browser
+                    - Turn off your phone
+                    - Lose internet connection
+                    
+                    You can return to this page later to check the results.
+                    Just wait for the "Running on Streamlit Cloud with Chromium" message before closing.
+                    """)
+                    
                     try:
                         with st.spinner('Starting reservation process...'):
                             bot = ReserveDate()
