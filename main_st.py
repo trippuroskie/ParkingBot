@@ -266,12 +266,14 @@ class ReserveDate:
 
     def checkout(self):
         try:
+            # Updated selector to match the exact button structure
             checkout_button = self.wait.until(EC.element_to_be_clickable((
-                By.XPATH, "//button[contains(@class, 'PlainButton--noStyle')]//div[contains(text(), 'Pay $10.00 & Park')]"
+                By.XPATH, "//div[contains(@class, 'ui basic center aligned segment')]//div[contains(text(), 'Pay $10.00 & Park')]"
             )))
             
+            # Get the parent button element
             parent_button = checkout_button.find_element(
-                By.XPATH, "./ancestor::button[contains(@class, 'PlainButton--noStyle')]"
+                By.XPATH, "./ancestor::button"
             )
             
             try:
@@ -289,7 +291,7 @@ class ReserveDate:
     def confirm_reservation(self):
         try:
             log_with_timestamp("Waiting for payment page to load...")
-            time.sleep(5)  # Initial wait for page load
+            time.sleep(5)  # Give page time to settle
             
             # First check if we're on the Honk payment page
             current_url = self.driver.current_url
@@ -298,123 +300,152 @@ class ReserveDate:
             if "honkmobile.com/checkout" in current_url:
                 log_with_timestamp("Detected Honk payment page, looking for payment button...")
                 
-                # Wait for the page to be fully loaded
-                self.wait.until(lambda driver: driver.execute_script("return document.readyState") == "complete")
-                time.sleep(2)  # Additional small wait after page load
+                # Updated payment button selectors based on the actual HTML structure
+                payment_selectors = [
+                    "//div[contains(@class, 'ui basic center aligned segment')]//div[contains(text(), 'Pay $10.00 & Park')]",
+                    "//div[contains(@class, 'ui basic center aligned segment')]//div[text()='Pay $10.00 & Park']",
+                    "//button//div[contains(text(), 'Pay $10.00 & Park')]",
+                    "//div[contains(@data-uw-rm-sr, 'Pay $10.00 & Park')]"
+                ]
                 
-                # Try to find any iframe that might contain the payment button
-                iframes = self.driver.find_elements(By.TAG_NAME, "iframe")
-                main_content = True
-                
-                # First try in main content, then check iframes if needed
-                while True:
+                payment_button = None
+                for selector in payment_selectors:
                     try:
-                        if not main_content:
-                            # Switch to iframe if we're checking iframes
-                            self.driver.switch_to.frame(iframes.pop(0))
-                        
-                        # Expanded list of payment button selectors
-                        payment_selectors = [
-                            "//button[contains(., 'Pay')]",
-                            "//button[contains(., '$10.00')]",
-                            "//button[contains(@class, 'pay')]",
-                            "//button[contains(@class, 'checkout')]",
-                            "//div[contains(@class, 'pay')]//button",
-                            "//div[contains(@class, 'checkout')]//button",
-                            "//button[contains(@id, 'pay')]",
-                            "//button[contains(@id, 'checkout')]",
-                            "//div[contains(@class, 'submit')]//button",
-                            "//input[@type='submit']",
-                            "//*[contains(@class, 'pay') or contains(@class, 'checkout')]",
-                            "//button[contains(@class, 'submit')]",
-                            "//button[contains(@class, 'confirm')]"
-                        ]
-                        
-                        for selector in payment_selectors:
-                            try:
-                                # Wait briefly for each selector
-                                payment_button = WebDriverWait(self.driver, 3).until(
-                                    EC.presence_of_element_located((By.XPATH, selector))
-                                )
-                                
-                                if payment_button and payment_button.is_displayed():
-                                    log_with_timestamp(f"Found payment button with selector: {selector}")
-                                    
-                                    # Try multiple click methods
-                                    try:
-                                        # First try regular click
-                                        payment_button.click()
-                                    except:
-                                        try:
-                                            # Try JavaScript click
-                                            self.driver.execute_script("arguments[0].click();", payment_button)
-                                        except:
-                                            # Try Actions click
-                                            actions = ActionChains(self.driver)
-                                            actions.move_to_element(payment_button)
-                                            actions.click()
-                                            actions.perform()
-                                    
-                                    log_with_timestamp("Payment button clicked")
-                                    
-                                    # Wait for confirmation or success page
-                                    log_with_timestamp("Waiting for payment to complete...")
-                                    success_conditions = [
-                                        "post-purchase" in self.driver.current_url,
-                                        "confirmation" in self.driver.current_url,
-                                        "success" in self.driver.current_url
-                                    ]
-                                    
-                                    max_wait = 30
-                                    start_time = time.time()
-                                    while not any(success_conditions) and time.time() - start_time < max_wait:
-                                        time.sleep(2)
-                                        current_url = self.driver.current_url
-                                        log_with_timestamp(f"Current URL while waiting: {current_url}")
-                                        success_conditions = [
-                                            "post-purchase" in current_url,
-                                            "confirmation" in current_url,
-                                            "success" in current_url
-                                        ]
-                                    
-                                    if any(success_conditions):
-                                        log_with_timestamp("Payment completed successfully!")
-                                        return
-                                    
-                                    raise Exception("Payment completion timeout")
-                                    
-                            except Exception as e:
-                                log_with_timestamp(f"Selector {selector} failed: {str(e)}")
-                                continue
-                        
-                        if main_content:
-                            if not iframes:
-                                break
-                            main_content = False
-                        else:
-                            self.driver.switch_to.default_content()
-                            if not iframes:
-                                break
-                            
-                    except IndexError:
-                        break
-                    except Exception as e:
-                        log_with_timestamp(f"Error while checking frame: {str(e)}")
-                        self.driver.switch_to.default_content()
-                        if not iframes:
+                        log_with_timestamp(f"Trying payment selector: {selector}")
+                        payment_button = self.wait.until(EC.presence_of_element_located((By.XPATH, selector)))
+                        if payment_button and payment_button.is_displayed():
+                            log_with_timestamp(f"Found payment button with selector: {selector}")
+                            # Get the parent button if we found a div
+                            if payment_button.tag_name.lower() != 'button':
+                                payment_button = payment_button.find_element(By.XPATH, "./ancestor::button")
                             break
+                    except Exception as e:
+                        log_with_timestamp(f"Payment selector {selector} failed: {str(e)}")
+                        continue
                 
-                # If we get here, we couldn't find the button
-                log_with_timestamp("Could not find payment button. Page source:")
-                log_with_timestamp(self.driver.page_source[:2000])
-                raise Exception("Payment button not found")
+                if not payment_button:
+                    log_with_timestamp("Could not find payment button. Page source:")
+                    log_with_timestamp(self.driver.page_source[:2000])
+                    raise Exception("Payment button not found")
                 
+                # Try to click the payment button
+                try:
+                    log_with_timestamp("Attempting to click payment button...")
+                    self.driver.execute_script("arguments[0].scrollIntoView(true);", payment_button)
+                    time.sleep(1)
+                    self.driver.execute_script("arguments[0].click();", payment_button)
+                    log_with_timestamp("Payment button clicked")
+                except Exception as e:
+                    log_with_timestamp(f"Error clicking payment button: {str(e)}")
+                    raise
+
+                # Wait for and handle the license plate confirmation dialog
+                log_with_timestamp("Waiting for license plate confirmation dialog...")
+                try:
+                    # Wait for the confirmation dialog title
+                    self.wait.until(EC.presence_of_element_located((
+                        By.XPATH, "//h1[contains(@class, 'PurchaseConfirm--header') and contains(text(), 'Does this look right?')]"
+                    )))
+                    log_with_timestamp("Found license plate confirmation dialog")
+
+                    # Look for and click the Confirm button using the specific class
+                    confirm_button = self.wait.until(EC.element_to_be_clickable((
+                        By.XPATH, "//button[contains(@class, 'oGMkMQAoYbD7f3oxRBJI ButtonComponent')]"
+                    )))
+                    log_with_timestamp("Found confirm button")
+                    
+                    # Click the confirm button
+                    try:
+                        self.driver.execute_script("arguments[0].scrollIntoView(true);", confirm_button)
+                        time.sleep(1)
+                        self.driver.execute_script("arguments[0].click();", confirm_button)
+                        log_with_timestamp("Clicked confirm button")
+                    except Exception as e:
+                        log_with_timestamp(f"Error clicking confirm button: {str(e)}")
+                        raise
+                except Exception as e:
+                    log_with_timestamp(f"Error handling license plate confirmation: {str(e)}")
+                    raise Exception("Failed to confirm license plate")
+                
+                # Wait for payment processing and verify success
+                log_with_timestamp("Waiting for payment to process...")
+                max_wait_time = 30
+                start_time = time.time()
+                success_verified = False
+                initial_url = self.driver.current_url
+                
+                while time.time() - start_time < max_wait_time and not success_verified:
+                    try:
+                        current_url = self.driver.current_url
+                        log_with_timestamp(f"Current URL during verification: {current_url}")
+                        
+                        # Only consider success if URL has changed from the initial checkout URL
+                        if current_url != initial_url:
+                            # Check for success indicators in URL
+                            success_url_indicators = [
+                                "post-purchase" in current_url,
+                                "confirmation" in current_url,
+                                "success" in current_url,
+                                "receipt" in current_url,
+                                "parking-reservation/" in current_url  # Add this new success indicator
+                            ]
+                            
+                            if any(success_url_indicators):
+                                # Additional verification - look for success elements or vehicle plate display
+                                try:
+                                    success_elements = self.driver.find_elements(By.XPATH,
+                                        "//*[contains(text(), 'Success') or contains(text(), 'Confirmed') or contains(text(), 'Thank you') or contains(text(), 'Receipt') or contains(@class, 'ParkingSession_plate__')]"
+                                    )
+                                    if success_elements:
+                                        success_messages = [elem.text for elem in success_elements if elem.is_displayed() and elem.text.strip()]
+                                        if success_messages:
+                                            log_with_timestamp("Found success indicators:", success_messages)
+                                            success_verified = True
+                                            break
+                                        
+                                    # Additional check specifically for the vehicle plate display
+                                    plate_elements = self.driver.find_elements(By.CLASS_NAME, "ParkingSession_plate__q3j4i")
+                                    if plate_elements:
+                                        for elem in plate_elements:
+                                            if elem.is_displayed() and elem.text.strip():
+                                                log_with_timestamp("Found vehicle plate display:", elem.text)
+                                                success_verified = True
+                                                break
+                                except Exception as e:
+                                    log_with_timestamp(f"Error checking success elements: {e}")
+                                    pass
+                        
+                        # Check for error messages
+                        error_elements = self.driver.find_elements(By.XPATH, 
+                            "//*[contains(@class, 'error') or contains(@class, 'alert') or contains(@class, 'notification')]"
+                        )
+                        if error_elements:
+                            error_messages = [elem.text for elem in error_elements if elem.is_displayed() and elem.text.strip()]
+                            if error_messages:
+                                log_with_timestamp("Found error messages:", error_messages)
+                                raise Exception(f"Payment failed with errors: {', '.join(error_messages)}")
+                        
+                        time.sleep(2)
+                        log_with_timestamp("Still waiting for confirmation...")
+                        
+                    except Exception as e:
+                        if "Payment failed with errors" in str(e):
+                            raise
+                        log_with_timestamp(f"Error during verification: {str(e)}")
+                        time.sleep(2)
+                
+                if not success_verified:
+                    log_with_timestamp("Payment verification failed. Current page source:")
+                    log_with_timestamp(self.driver.page_source[:2000])
+                    raise Exception("Could not verify payment success - URL never changed from checkout page")
+                
+                log_with_timestamp("Payment completed and verified successfully!")
             else:
                 raise Exception(f"Unexpected URL: {current_url}")
             
         except Exception as e:
             log_with_timestamp(f"Error in confirm_reservation: {str(e)}")
-            log_with_timestamp(f"Final URL: {self.driver.current_url}")
+            log_with_timestamp("Final URL:", self.driver.current_url)
             log_with_timestamp("Final page source:")
             log_with_timestamp(self.driver.page_source[:2000])
             raise
