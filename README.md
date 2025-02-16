@@ -35,13 +35,6 @@ streamlit run main_st.py
 python main.py
 ```
 
-## Features
-
-- Automated 4+ Carpool spot reservation
-- Headless Chrome operation
-- Real-time logging
-- Configurable retry attempts and intervals
-- User-friendly web interface with dark mode
 
 ## Disclaimer
 
