@@ -473,7 +473,7 @@ def add_bg_from_local(image_file):
     )
 
 # Add the background image
-add_bg_from_local('./brighton_1.png')
+add_bg_from_local('./images/brighton_1.png')
 
 # Add custom CSS for the container
 st.markdown("""
