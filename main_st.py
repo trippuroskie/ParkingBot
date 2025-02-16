@@ -12,6 +12,7 @@ import os
 from dotenv import load_dotenv
 import base64
 from datetime import datetime
+import random
 
 def log_with_timestamp(*args):
     """Modified log_with_timestamp function for Streamlit"""
@@ -30,18 +31,33 @@ class ReserveDate:
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--window-size=1920,1080")
-        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
         chrome_options.add_argument('--enable-javascript')
         chrome_options.add_argument("--start-maximized")
-        chrome_options.add_argument("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36")
-        chrome_options.add_argument("--accept-lang=en-US")
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        chrome_options.add_experimental_option("useAutomationExtension", False)
-        chrome_options.add_experimental_option("prefs", {
-            "credentials_enable_service": False,
-            "profile.password_manager_enabled": False,
-        })
+        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        chrome_options.add_argument('--disable-extensions')
+        chrome_options.add_argument('--disable-infobars')
+        chrome_options.add_argument('--lang=en-US,en;q=0.9')
+        chrome_options.add_argument('--ignore-certificate-errors')
+        chrome_options.add_argument('--allow-running-insecure-content')
+        chrome_options.add_argument(f'--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         
+        # Add additional preferences
+        chrome_options.add_experimental_option('excludeSwitches', ['enable-automation', 'enable-logging'])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
+        chrome_options.add_experimental_option('prefs', {
+            'credentials_enable_service': False,
+            'profile.password_manager_enabled': False,
+            'profile.default_content_setting_values.notifications': 2,
+            'profile.managed_default_content_settings.javascript': 1,
+            'profile.managed_default_content_settings.cookies': 1,
+            'profile.managed_default_content_settings.images': 1,
+            'profile.default_content_settings.popups': 2,
+            'profile.managed_default_content_settings.plugins': 1,
+            'profile.managed_default_content_settings.mixed_script': 1,
+            'profile.managed_default_content_settings.media_stream': 2,
+            'profile.managed_default_content_settings.geolocation': 2
+        })
+
         try:
             # Check if running on Streamlit Cloud (Debian environment)
             if os.path.exists("/usr/bin/chromium"):
@@ -71,6 +87,25 @@ class ReserveDate:
                 st.info("Running in local environment")
                 self.service = Service(ChromeDriverManager().install())
                 self.driver = webdriver.Chrome(service=self.service, options=chrome_options)
+
+            # Execute stealth JS
+            self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+                "source": """
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => undefined
+                    });
+                    Object.defineProperty(navigator, 'plugins', {
+                        get: () => [1, 2, 3, 4, 5]
+                    });
+                    Object.defineProperty(navigator, 'languages', {
+                        get: () => ['en-US', 'en']
+                    });
+                    window.chrome = {
+                        runtime: {}
+                    };
+                """
+            })
+            
         except Exception as e:
             st.error(f"Chrome initialization failed: {str(e)}")
             st.error("Additional debugging information:")
@@ -93,30 +128,30 @@ class ReserveDate:
         
         # Set page load timeout
         self.driver.set_page_load_timeout(30)
-        self.wait = WebDriverWait(self.driver, 20)  # Increased wait time
-        self.calendar_wait = WebDriverWait(self.driver, 30)  # Increased calendar wait time
-        
-        # Execute CDP commands to prevent detection
-        self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-            "source": """
-                Object.defineProperty(navigator, 'webdriver', {
-                    get: () => undefined
-                })
-            """
-        })
+        self.wait = WebDriverWait(self.driver, 20)
+        self.calendar_wait = WebDriverWait(self.driver, 30)
 
     def login(self, username, password):
         try:
             log_with_timestamp("Attempting to navigate to login page...")
             self.driver.get("https://reservenski.parkbrightonresort.com/login")
             
+            # Wait for page to be fully loaded
+            self.wait.until(lambda driver: driver.execute_script('return document.readyState') == 'complete')
+            time.sleep(3)  # Additional wait for JavaScript
+            
             log_with_timestamp("Waiting for email field...")
-            email_element = self.wait.until(EC.presence_of_element_located((By.ID, "emailAddress")))
+            email_element = self.wait.until(
+                EC.presence_of_element_located((By.ID, "emailAddress"))
+            )
+            self.wait.until(EC.element_to_be_clickable((By.ID, "emailAddress")))
+            
+            # Clear and enter email with random delays
             email_element.clear()
             time.sleep(1)
             for char in username:
                 email_element.send_keys(char)
-                time.sleep(0.1)
+                time.sleep(random.uniform(0.1, 0.3))
             
             log_with_timestamp("Entering password...")
             password_element = self.driver.find_element(By.ID, "password")
@@ -124,31 +159,39 @@ class ReserveDate:
             time.sleep(1)
             for char in password:
                 password_element.send_keys(char)
-                time.sleep(0.1)
+                time.sleep(random.uniform(0.1, 0.3))
             
             log_with_timestamp("Looking for login button...")
-            try:
-                login_button = self.wait.until(EC.element_to_be_clickable((
-                    By.CSS_SELECTOR, "button.Login_submitButton__fMHAq"
-                )))
-            except:
+            login_button = None
+            button_selectors = [
+                (By.CSS_SELECTOR, "button.Login_submitButton__fMHAq"),
+                (By.XPATH, "//button[contains(text(), 'Login') or contains(text(), 'Sign In')]"),
+                (By.CSS_SELECTOR, "button[type='submit']"),
+                (By.XPATH, "//button[contains(@class, 'submitButton')]")
+            ]
+            
+            for selector_type, selector in button_selectors:
                 try:
-                    login_button = self.wait.until(EC.element_to_be_clickable((
-                        By.XPATH, "//button[contains(text(), 'Login') or contains(text(), 'Sign In')]"
-                    )))
+                    login_button = self.wait.until(EC.element_to_be_clickable((selector_type, selector)))
+                    break
                 except:
-                    login_button = self.wait.until(EC.element_to_be_clickable((
-                        By.CSS_SELECTOR, "button[type='submit']"
-                    )))
+                    continue
+            
+            if not login_button:
+                raise Exception("Could not find login button")
             
             log_with_timestamp("Clicking login button...")
-            self.driver.execute_script("arguments[0].click();", login_button)
+            time.sleep(2)  # Wait before clicking
+            try:
+                login_button.click()
+            except:
+                self.driver.execute_script("arguments[0].click();", login_button)
             
-            # Wait for login to complete and verify
+            # Wait for login to complete
             log_with_timestamp("Waiting for login to complete...")
             time.sleep(5)
             
-            # Verify login success by checking URL or specific elements
+            # Verify login success
             max_retries = 3
             retry_count = 0
             while retry_count < max_retries:
@@ -157,32 +200,29 @@ class ReserveDate:
                 
                 if "login" not in current_url.lower():
                     log_with_timestamp("Login successful - URL changed from login page")
-                    break
-                    
-                try:
-                    # Check if we can find any error messages
-                    error_messages = self.driver.find_elements(By.CSS_SELECTOR, "[class*='error'], [class*='alert']")
-                    if error_messages:
-                        log_with_timestamp("Found error messages: " + ", ".join([msg.text for msg in error_messages]))
-                        raise Exception("Login failed - error message found")
-                except:
-                    pass
+                    return
+                
+                # Check for error messages
+                error_messages = self.driver.find_elements(By.CSS_SELECTOR, "[class*='error'], [class*='alert']")
+                if error_messages:
+                    error_text = ", ".join([msg.text for msg in error_messages if msg.text.strip()])
+                    if error_text:
+                        raise Exception(f"Login failed - Error messages found: {error_text}")
                 
                 retry_count += 1
                 if retry_count < max_retries:
                     log_with_timestamp(f"Login verification attempt {retry_count + 1}/{max_retries}...")
                     time.sleep(3)
             
-            if retry_count >= max_retries:
-                raise Exception("Failed to verify login success after multiple attempts")
-            
-            log_with_timestamp("Login sequence completed and verified")
+            # If we get here, login failed
+            page_source = self.driver.page_source
+            log_with_timestamp("Login failed. Page source:")
+            log_with_timestamp(page_source[:1000])
+            raise Exception("Failed to verify login success after multiple attempts")
             
         except Exception as e:
             log_with_timestamp(f"Error during login: {str(e)}")
             log_with_timestamp(f"Current URL: {self.driver.current_url}")
-            log_with_timestamp("Page source:")
-            log_with_timestamp(self.driver.page_source[:1000])
             raise
 
     def navigate_to_calendar(self):
