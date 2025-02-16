@@ -822,168 +822,112 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Add Streamlit title
-st.markdown('<h1 class="title">Brighton Bot</h1>', unsafe_allow_html=True)
-
-# Create the main container with a dark background
-st.markdown("""
-    <div class="main-container">
-        <p style="font-size: 1.3rem; margin-bottom: 1.5rem;">⚠️ Important Prerequisites:</p>
-        <p>Before using, make sure on Honk mobile you have:</p>
-        <ol>
-            <li>Your credit card info saved at: <a href="https://parking.honkmobile.com/payment-cards" target="_blank">https://parking.honkmobile.com/payment-cards</a></li>
-            <li>Only one license plate saved at: <a href="https://parking.honkmobile.com/vehicles" target="_blank">https://parking.honkmobile.com/vehicles</a></li>
-        </ol>
-    </div>
-""", unsafe_allow_html=True)
-
-# Add form elements inside a container with the same styling
-with st.container():
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        # Load environment variables
-        load_dotenv()
-        default_username = os.getenv('HONK_USERNAME', '')
-        default_password = os.getenv('HONK_PASSWORD', '')
-        
-        with st.form("reservation_form"):
-            username = st.text_input('Enter your Honk mobile email:', 
-                                   value=default_username, 
-                                   key='username',
-                                   help="Your Honk mobile account email")
-            
-            password = st.text_input('Enter your Honk mobile password:', 
-                                   value=default_password, 
-                                   type='password', 
-                                   key='password',
-                                   help="Your Honk mobile account password")
-            
-            target_date = st.text_input('Enter target date (day of month):', 
-                                      key='target_date',
-                                      help="The day of the month you want to reserve (e.g., '15')")
-            
-            col_attempts, col_sleep = st.columns(2)
-            with col_attempts:
-                max_attempts = st.number_input('Maximum attempts:', 
-                                             min_value=1, 
-                                             value=100, 
-                                             key='max_attempts',
-                                             help="Maximum number of times to check for availability")
-            
-            with col_sleep:
-                sleep_duration = st.number_input('Sleep duration (seconds):', 
-                                               min_value=1, 
-                                               value=5, 
-                                               key='sleep_duration',
-                                               help="Time to wait between attempts")
-            
-            submitted = st.form_submit_button("Start Reservation")
-            
-            if submitted:
-                if not username or not password or not target_date:
-                    st.error('⚠️ Please fill in all required fields')
-                else:
-                    # Add information about background processing
-                    st.info("""
-                    ℹ️ Important Note:
-                    Once the process starts, it will continue running on our servers even if you:
-                    - Close your browser
-                    - Turn off your phone
-                    - Lose internet connection
-                    
-                    You can return to this page later to check the results.
-                    Just wait for the "Running on Streamlit Cloud with Chromium" message before closing.
-                    """)
-                    
-                    try:
-                        with st.spinner('Starting reservation process...'):
-                            start_background_job(username, password, target_date, int(max_attempts), float(sleep_duration))
-                    except Exception as e:
-                        st.error(f'❌ Error: {str(e)}')
-                        st.error('Please check your credentials and try again.')
-                    finally:
-                        st.info('✨ Process completed. Check the logs above for details.')
-
-    # Add helpful information in the sidebar
-    with st.sidebar:
-        st.markdown("""
-        ### 📋 Instructions
-        
-        1. Enter your Honk mobile credentials
-        2. Specify the target date (day of month)
-        3. Adjust attempts and sleep duration if needed
-        4. Click "Start Reservation"
-        
-        ### ⚡ Tips
-        
-        - Keep the window open while the bot runs
-        - Check the logs for real-time updates
-        - If you get errors, try increasing sleep duration
-        
-        ### 🔒 Security Note
-        
-        Your credentials are only used to log in to Honk mobile and are never stored.
-        """)
-
-# Add this at the start of your Streamlit UI code
 def main():
     st.markdown('<h1 class="title">Brighton Bot</h1>', unsafe_allow_html=True)
 
     # Create a placeholder for logs at the top
     log_placeholder = st.empty()
     
-    # Create the main form
-    with st.form("reservation_form"):
-        username = st.text_input('Enter your Honk mobile email:', 
-                               value=os.getenv('HONK_USERNAME', ''), 
-                               key='username',
-                               help="Your Honk mobile account email")
-        
-        password = st.text_input('Enter your Honk mobile password:', 
-                               value=os.getenv('HONK_PASSWORD', ''), 
-                               type='password', 
-                               key='password',
-                               help="Your Honk mobile account password")
-        
-        target_date = st.text_input('Enter target date (day of month):', 
-                                  key='target_date',
-                                  help="The day of the month you want to reserve (e.g., '15')")
-        
-        col_attempts, col_sleep = st.columns(2)
-        with col_attempts:
-            max_attempts = st.number_input('Maximum attempts:', 
-                                         min_value=1, 
-                                         value=100, 
-                                         key='max_attempts',
-                                         help="Maximum number of times to check for availability")
-        
-        with col_sleep:
-            sleep_duration = st.number_input('Sleep duration (seconds):', 
-                                           min_value=1, 
-                                           value=5, 
-                                           key='sleep_duration',
-                                           help="Time to wait between attempts")
-        
-        submitted = st.form_submit_button("Start Reservation")
+    # Create the main container with a dark background
+    st.markdown("""
+        <div class="main-container">
+            <p style="font-size: 1.3rem; margin-bottom: 1.5rem;">⚠️ Important Prerequisites:</p>
+            <p>Before using, make sure on Honk mobile you have:</p>
+            <ol>
+                <li>Your credit card info saved at: <a href="https://parking.honkmobile.com/payment-cards" target="_blank">https://parking.honkmobile.com/payment-cards</a></li>
+                <li>Only one license plate saved at: <a href="https://parking.honkmobile.com/vehicles" target="_blank">https://parking.honkmobile.com/vehicles</a></li>
+            </ol>
+        </div>
+    """, unsafe_allow_html=True)
 
-    # Handle form submission
-    if submitted:
-        if not username or not password or not target_date:
-            st.error('⚠️ Please fill in all required fields')
-        else:
-            st.info("""
-            ℹ️ Important Note:
-            Once you see "Running on Streamlit Cloud with Chromium", the process will continue running on our servers even if you:
-            - Close your browser
-            - Turn off your phone
-            - Lose internet connection
+    # Add form elements inside a container with the same styling
+    with st.container():
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            # Load environment variables
+            load_dotenv()
+            default_username = os.getenv('HONK_USERNAME', '')
+            default_password = os.getenv('HONK_PASSWORD', '')
             
-            You can return to this page later to check the results.
-            The process will keep running until it succeeds or reaches maximum attempts.
+            with st.form(key="reservation_form"):
+                username = st.text_input('Enter your Honk mobile email:', 
+                                       value=default_username, 
+                                       key='username',
+                                       help="Your Honk mobile account email")
+                
+                password = st.text_input('Enter your Honk mobile password:', 
+                                       value=default_password, 
+                                       type='password', 
+                                       key='password',
+                                       help="Your Honk mobile account password")
+                
+                target_date = st.text_input('Enter target date (day of month):', 
+                                          key='target_date',
+                                          help="The day of the month you want to reserve (e.g., '15')")
+                
+                col_attempts, col_sleep = st.columns(2)
+                with col_attempts:
+                    max_attempts = st.number_input('Maximum attempts:', 
+                                                 min_value=1, 
+                                                 value=100, 
+                                                 key='max_attempts',
+                                                 help="Maximum number of times to check for availability")
+                
+                with col_sleep:
+                    sleep_duration = st.number_input('Sleep duration (seconds):', 
+                                                   min_value=1, 
+                                                   value=5, 
+                                                   key='sleep_duration',
+                                                   help="Time to wait between attempts")
+                
+                submitted = st.form_submit_button("Start Reservation")
+                
+                if submitted:
+                    if not username or not password or not target_date:
+                        st.error('⚠️ Please fill in all required fields')
+                    else:
+                        # Add information about background processing
+                        st.info("""
+                        ℹ️ Important Note:
+                        Once you see "Running on Streamlit Cloud with Chromium", the process will continue running on our servers even if you:
+                        - Close your browser
+                        - Turn off your phone
+                        - Lose internet connection
+                        
+                        You can return to this page later to check the results.
+                        The process will keep running until it succeeds or reaches maximum attempts.
+                        """)
+                        
+                        try:
+                            with st.spinner('Starting reservation process...'):
+                                start_background_job(username, password, target_date, int(max_attempts), float(sleep_duration))
+                        except Exception as e:
+                            st.error(f'❌ Error: {str(e)}')
+                            st.error('Please check your credentials and try again.')
+                        finally:
+                            st.info('✨ Process completed. Check the logs above for details.')
+
+        # Add helpful information in the sidebar
+        with st.sidebar:
+            st.markdown("""
+            ### 📋 Instructions
+            
+            1. Enter your Honk mobile credentials
+            2. Specify the target date (day of month)
+            3. Adjust attempts and sleep duration if needed
+            4. Click "Start Reservation"
+            
+            ### ⚡ Tips
+            
+            - Keep the window open while the bot runs
+            - Check the logs for real-time updates
+            - If you get errors, try increasing sleep duration
+            
+            ### 🔒 Security Note
+            
+            Your credentials are only used to log in to Honk mobile and are never stored.
             """)
-            
-            start_background_job(username, password, target_date, max_attempts, sleep_duration)
 
     # Display job status and logs
     if st.session_state.job_running:
