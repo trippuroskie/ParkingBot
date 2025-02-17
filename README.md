@@ -38,4 +38,4 @@ python main.py
 
 ## Disclaimer
 
-For educational purposes only. Use responsibly and in accordance with Brighton Resort's terms of service.
+For educational purposes only. Use responsibly and in accordance with terms of service.
